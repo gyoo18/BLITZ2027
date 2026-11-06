@@ -1,0 +1,17 @@
+# Build output and IDE files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# Blitz launcher output in this folder (downloaded games, local game records, logs),
+# anchored so same-named source folders deeper down still count; and secrets.
+/blitz-games/
+/game.json
+/game_logs.txt
+/error.log
+/launcher.log
+.env*

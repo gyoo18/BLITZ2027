@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+import asyncio
+import dataclasses
+import json
+import os
+import traceback
+from sys import stderr
+
+import msgspec
+from websockets.asyncio.client import connect, ClientConnection
+from websockets.exceptions import ConnectionClosed
+
+from bot import Bot
+from game_message import TeamGameState
+
+
+async def run():
+    uri = "ws://127.0.0.1:8765"
+
+    async with connect(uri, max_size=None) as websocket:
+        bot = Bot()
+        token = os.environ.get("TOKEN")
+        if token:
+            await websocket.send(json.dumps({"type": "REGISTER", "token": token}))
+        else:
+            await websocket.send(
+                json.dumps({"type": "REGISTER", "teamName": "MyPythonicBot"})
+            )
+
+        await game_loop(websocket=websocket, bot=bot)
+
+
+async def game_loop(websocket: ClientConnection, bot: Bot):
+    while True:
+        try:
+            message = await websocket.recv()
+        except ConnectionClosed as closed:
+            # Connection is closed, the game is probably over (with the reason the server gave, e.g. why it refused the bot)
+            reason = closed.rcvd.reason if closed.rcvd else ""
+            print(f"Websocket was closed. {reason}".strip())
+            break
+
+        game_message: TeamGameState = msgspec.json.decode(message, type=TeamGameState)
+
+        if game_message.lastTickErrors:
+            print(
+                "Errors during last tick: " + ", ".join(game_message.lastTickErrors),
+                file=stderr,
+            )
+
+        print(f"Playing tick {game_message.tick}")
+
+        actions = []
+
+        # Just so your bot doesn't completely crash. ;)
+        try:
+            actions = bot.get_next_move(game_message)
+        except Exception:
+            print("Exception while getting next moves:")
+            print(traceback.format_exc())
+
+        payload = {
+            "type": "COMMAND",
+            "tick": game_message.tick,
+            "actions": [dataclasses.asdict(action) for action in actions],
+        }
+
+        await websocket.send(msgspec.json.encode(payload))
+
+
+if __name__ == "__main__":
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run())
