@@ -8,11 +8,11 @@ import traceback
 from sys import stderr
 
 import msgspec
-from websockets.asyncio.client import connect, ClientConnection
+from game_message import TeamGameState
+from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 
 from bot import Bot
-from game_message import TeamGameState
 
 
 async def run():
